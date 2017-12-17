@@ -7,6 +7,7 @@ Usage:
 
 from string import Template
 from pandocfilters import toJSONFilter, RawBlock, RawInline
+import pandocfilters as pf
 
 
 def unpack_code(value, language):
@@ -49,7 +50,11 @@ def unpack_metadata(meta):
     else:
         # Return default settings.
         return {'language': 'text'}
-    
+
+
+def latex(s):
+    return pf.RawBlock('latex', s)
+
 
 def minted(key, value, format, meta):
     ''' Use minted for code in LaTeX.
@@ -60,13 +65,73 @@ def minted(key, value, format, meta):
         format  target output format
         meta    document metadata
     '''
+
+    # required, beamer wont work.
     if format != 'latex':
         return
 
+    # https://git.framasoft.org/Gwendal/better-pandoc-markdown2beamer/blob/master/columnfilter.py
+    if key == "Para":
+        value = pf.stringify(value)
+        if value.startswith('[') and value.endswith(']') and \
+                'columns' in value:
+            content = value[1:-1]
+            if content == "columns":
+                return latex(r'\begin{columns}')
+            elif content == "/columns":
+                return latex(r'\end{columns}')
+            elif content.startswith("column="):
+                return latex(r'\column{%s\textwidth}' % content[7:])
+        if value.startswith('[') and value.endswith(']') and \
+                'questions' in value:
+            content = value[1:-1]
+            if content == "questions":
+                return latex(r'\begin{questions}')
+            elif content == "/questions":
+                return latex(r'\end{questions}')
+            elif content.startswith("question="):
+                return latex(r'\asdfasdquestion\[%s\]' % content[9:])
+        if value.startswith('[') and value.endswith(']') and \
+                'parts' in value:
+            content = value[1:-1]
+            if content == "parts":
+                return latex(r'\begin{parts}')
+            elif content == "/parts":
+                return latex(r'\end{parts}')
+        if value.startswith('[') and value.endswith(']') and \
+                'sol' in value:
+            content = value[1:-1]
+            if content == "sol":
+                return latex(r'\begin{solutionorlines}[1in]')
+            elif content == "/sol":
+                return latex(r'\end{solutionorlines}')
+            elif content.startswith("sol="):
+                return latex(r'\begin{solutionorlines}[%s]' % content[4:])
+        if value.startswith('[') and value.endswith(']') and \
+                'question' in value:
+            content = value[1:-1]
+            if content == "question":
+                return latex(r"\question")
+            elif content.startswith("question="):
+                return latex(r'\question[%s]' % content[9:])
+        if value.startswith('[') and value.endswith(']') and \
+                'part' in value:
+            content = value[1:-1]
+            if content == "part":
+                return latex(r"\part")
+            elif content.startswith("part="):
+                return latex(r'\part[%s]' % content[5:])
+        if value.startswith('[') and value.endswith(']') and \
+                'hideinpublic' in value:
+            content = value[1:-1]
+            if content == "hideinpublic":
+                return latex(r"\ifshowforanswer%")
+            elif content == "/hideinpublic":
+                return latex(r'\fi')
     # Determine what kind of code object this is.
     if key == 'CodeBlock':
         template = Template(
-            '\\begin{minted}[$attributes]{$language}\n$contents\n\end{minted}'
+            '\\begin{minted}[$attributes,breaklines,autogobble]{$language}\n$contents\n\end{minted}'
         )
         Element = RawBlock
     elif key == 'Code':
@@ -84,4 +149,3 @@ def minted(key, value, format, meta):
 
 if __name__ == '__main__':
     toJSONFilter(minted)
-
